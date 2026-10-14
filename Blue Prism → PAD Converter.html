@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Blue Prism → Power Automate Desktop Converter</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#f6f7f9;--surface:#fff;--text:#1d2330;--muted:#667085;--border:#d9dde5;--accent:#2457d6;--accent-t:#fff;
+  --ok:#c6efce;--warn:#ffeb9c;--bad:#ffc7ce;--in:#ddebf7;--stroke:#6b7280;--edge:#5b6472;--code:#f0f2f6;--err:#d92d20;--wrn:#b54708;--t:#12803a;--f:#d92d20;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12151c;--surface:#1b2029;--text:#e7eaf0;--muted:#9aa3b2;--border:#323a48;--accent:#6b93ff;--accent-t:#0b1020;
+  --ok:#24472f;--warn:#554a1c;--bad:#5a2a31;--in:#22364d;--stroke:#8a93a3;--edge:#9aa3b2;--code:#222833;--err:#ff8a80;--wrn:#f5b971;--t:#6fd08c;--f:#ff8a80;}}
+:root[data-theme="dark"]{
+  --bg:#12151c;--surface:#1b2029;--text:#e7eaf0;--muted:#9aa3b2;--border:#323a48;--accent:#6b93ff;--accent-t:#0b1020;
+  --ok:#24472f;--warn:#554a1c;--bad:#5a2a31;--in:#22364d;--stroke:#8a93a3;--edge:#9aa3b2;--code:#222833;--err:#ff8a80;--wrn:#f5b971;--t:#6fd08c;--f:#ff8a80;}
+*,*:before,*:after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:14px 16px 4px}
+h1{font-size:18px;margin:0 0 2px}
+.sub{color:var(--muted);font-size:13px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;padding:8px 16px;align-items:center}
+button,select,.btn{font:inherit;border:1px solid var(--border);background:var(--surface);color:var(--text);padding:8px 12px;border-radius:8px;cursor:pointer}
+button.primary,.btn.primary{background:var(--accent);color:var(--accent-t);border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:not-allowed}
+input[type=file]{display:none}
+select{max-width:100%}
+#stats{padding:0 16px 6px;font-size:13px;color:var(--muted)}
+.tabs{display:flex;gap:4px;padding:0 16px;overflow-x:auto;border-bottom:1px solid var(--border)}
+.tab{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;padding:8px 10px;white-space:nowrap;color:var(--muted)}
+.tab.on{color:var(--text);border-bottom-color:var(--accent);font-weight:600}
+.pane{display:none;padding:12px 16px}
+.pane.on{display:block}
+.scroll{overflow:auto;max-width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px}
+.diagram{max-height:68vh}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 10px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+th{position:sticky;top:0;background:var(--surface)}
+tr.sel td{outline:2px solid var(--accent);outline-offset:-2px}
+.Mapped{background:var(--ok)}.Partial{background:var(--warn)}.Unsupported{background:var(--bad)}
+pre{margin:0;padding:12px;background:var(--code);border-radius:10px;overflow:auto;font:12.5px/1.5 ui-monospace,Consolas,monospace;max-height:60vh}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);margin:8px 0}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid var(--stroke);vertical-align:-1px;margin-right:4px}
+#detail .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px}
+#log{margin:8px 16px 24px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;max-height:180px;overflow:auto;font:12px/1.5 ui-monospace,Consolas,monospace}
+#log .e{color:var(--err)}#log .w{color:var(--wrn)}
+svg text{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;fill:var(--text)}
+.node{cursor:pointer}
+.node:hover rect,.node:hover polygon{stroke-width:2.5;stroke:var(--accent)}
+.empty{color:var(--muted);padding:20px;text-align:center}
+#ready .e{color:var(--err)} #ready .o{color:var(--t)} #ready ul{margin:4px 0 0 18px;padding:0}
+#pkgBody table td,#pkgBody table th{padding:3px 8px;font-size:12px} #pkgBody select{padding:2px 6px}
+.zoom{display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.zoom button{padding:4px 10px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Blue Prism → Power Automate Desktop</h1>
+  <div class="sub">Load a <b>.zip</b> containing .bprelease / .bpprocess / .bpobject files plus attachments and variables files (or a single Blue Prism file). Everything runs locally in your browser.</div>
+</header>
+
+<div class="bar">
+  <label class="btn primary" for="file">Open ZIP or Blue Prism file…</label>
+  <input id="file" type="file" accept=".zip,.bprelease,.bpprocess,.bpobject,.xml,text/xml">
+  <button id="sampleBtn">Load sample</button>
+  <select id="procSel" aria-label="Process" hidden></select>
+  <select id="pageSel" aria-label="Page" hidden></select>
+</div>
+<div id="stats"></div>
+<div id="ready" class="sub" style="padding:0 16px 6px"></div>
+<details id="pkg" hidden style="padding:0 16px 8px"><summary id="pkgSum" class="sub" style="cursor:pointer"></summary><div id="pkgBody" style="font-size:13px;margin-top:6px"></div></details>
+
+<div class="bar">
+  <button id="zipBtn" disabled>Export PAD solution (.zip)</button>
+  <button id="robinBtn" disabled>Save Robin script</button>
+  <button id="copyBtn" disabled>Copy script</button>
+  <button id="bundleBtn" disabled>Export full bundle (.zip)</button>
+</div>
+
+<div class="tabs" role="tablist">
+  <button class="tab on" data-t="in">1. Input flow</button>
+  <button class="tab" data-t="map">2. Mapping</button>
+  <button class="tab" data-t="out">3. PAD output flow</button>
+  <button class="tab" data-t="script">4. Robin script</button>
+</div>
+
+<section class="pane on" id="p-in"><div class="zoom"><button data-z="-">−</button><button data-z="+">+</button><button data-z="fit">Fit</button><button data-z="1">100%</button><span class="sub" id="zl"></span></div><div class="scroll diagram" id="svgIn"><div class="empty">Open a Blue Prism file to begin.</div></div></section>
+<section class="pane" id="p-map"><div class="scroll" style="max-height:70vh"><table id="tbl"><thead><tr><th>Page</th><th>Blue Prism stage</th><th>Type</th><th>PAD label</th><th>PAD action</th><th>Status</th><th>Notes</th></tr></thead><tbody></tbody></table></div></section>
+<section class="pane" id="p-out"><div class="zoom"><button data-z="-">−</button><button data-z="+">+</button><button data-z="fit">Fit</button><button data-z="1">100%</button></div><div class="scroll diagram" id="svgOut"><div class="empty">Nothing converted yet.</div></div></section>
+<section class="pane" id="p-script"><pre id="script">No script yet.</pre></section>
+
+<div class="pane on" style="padding-top:0"><div class="legend">
+  <span><i class="sw" style="background:var(--in)"></i>Blue Prism stage</span>
+  <span><i class="sw" style="background:var(--ok)"></i>Fully mapped</span>
+  <span><i class="sw" style="background:var(--warn)"></i>Needs review</span>
+  <span><i class="sw" style="background:var(--bad)"></i>Unsupported</span>
+  <span>Tap a node for details</span></div>
+  <div id="detail"></div></div>
+<div id="log" aria-live="polite"></div>
+<script>
+"use strict";
+/* ============ helpers ============ */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const oneLine = s => String(s ?? "").replace(/[\r\n]+/g, " ").trim();
+let logCount = 0;
+function log(msg, cls){
+  const box=$("log"); if(!box) return;
+  if(++logCount>400){ box.removeChild(box.firstChild); }
+  const d=document.createElement("div"); if(cls)d.className=cls;
+  d.textContent=new Date().toLocaleTimeString()+"  "+msg; box.appendChild(d); box.scrollTop=1e9;
+}
+class ConversionError extends Error {}
+const nid = s => String(s ?? "").trim().toLowerCase();
+
+/* ============ parser (namespace-agnostic) ============ */
+const L = e => e.localName.toLowerCase();
+const kids = e => Array.from(e.children);
+const child = (e,n) => kids(e).find(c => L(c)===n) || null;
+const attr = (e,n) => (e && e.getAttribute(n)) || "";
+const txt = e => e ? e.textContent.trim() : "";
+const LINK_TAGS = {onsuccess:"", ondone:"Done", ontrue:"True", onfalse:"False", ontimeout:"Timeout", onerror:"Error"};
+
+function parseBp(xmlText){
+  xmlText = String(xmlText||"").replace(/^\uFEFF/,"");
+  if(!xmlText.trim()) throw new ConversionError("The file is empty.");
+  const doc = new DOMParser().parseFromString(xmlText, "application/xml");
+  const pe = doc.getElementsByTagName("parsererror")[0];
+  if (pe) throw new ConversionError("The file is not valid XML ("+oneLine(pe.textContent).slice(0,160)+"). Please select a Blue Prism export (.bprelease, .bpprocess or .bpobject).");
+  const result = [];
+  for (const el of doc.getElementsByTagName("*")) {
+    if (L(el)!=="process" || !kids(el).some(c=>L(c)==="stage")) continue;
+    const wrapper = el.parentElement && L(el.parentElement)==="process" ? el.parentElement : null;
+    const p = { name: oneLine(attr(el,"name") || (el.parentElement ? attr(el.parentElement,"name") : "")) || "Process"+(result.length+1),
+                id: nid(attr(wrapper||el,"id")||attr(el,"id")), stages:[], pages:[], errors:[] };
+    const pageDefs = new Map();
+    for (const sh of kids(el).filter(c=>L(c)==="subsheet")) pageDefs.set(nid(attr(sh,"subsheetid")), oneLine(txt(child(sh,"name"))));
+    const seen = new Map();
+    for (const st of kids(el).filter(c=>L(c)==="stage")) {
+      try {
+        const s = parseStage(st);
+        if (seen.has(s.id)) { const n=seen.get(s.id)+1; seen.set(s.id,n); p.errors.push(`Duplicate stage id ${s.id} ('${s.name}'); renamed.`); s.id += "#dup"+n; }
+        else seen.set(s.id,0);
+        p.stages.push(s);
+      } catch(e){ p.errors.push(`Stage '${oneLine(attr(st,"name"))}': ${e.message}`); }
+    }
+    // pages
+    const order = []; const byId = new Map();
+    for (const [id,name] of pageDefs) { const pg={id,name:name||"Page "+(order.length+1),stages:[]}; order.push(pg); byId.set(id,pg); }
+    for (const s of p.stages){
+      let pg = byId.get(s.pageId);
+      if(!pg){ pg = {id:s.pageId, name: s.pageId ? "Page "+(order.length+1) : "Main Page", stages:[]}; order.push(pg); byId.set(s.pageId,pg); }
+      pg.stages.push(s); s.page = pg;
+    }
+    p.pages = order.filter(pg=>pg.stages.length);
+    pairLoops(p);
+    result.push(p);
+  }
+  if (!result.length) throw new ConversionError("No process definitions were found in this file. Is it a Blue Prism export?");
+  return result;
+}
+
+function parseStage(st){
+  const s = { id:nid(attr(st,"stageid")), name:oneLine(attr(st,"name")), type:oneLine(attr(st,"type")), pageId:nid(txt(child(st,"subsheetid"))),
+              expr:"", target:"", dataType:"", init:"", obj:"", act:"", calleeId:"", loopKind:"", loopData:"", narrative:"",
+              excType:"", excDetail:"", steps:[], inputs:[], outputs:[], links:[], page:null, loopPair:null };
+  if (!s.id) throw new Error("missing stageid");
+  if (!s.name) s.name = s.type || "(unnamed)";
+  s.narrative = oneLine(txt(child(st,"narrative")));
+  s.expr = attr(child(st,"decision"),"expression");
+  const calc = child(st,"calculation");
+  if (calc){ s.expr = attr(calc,"expression"); s.target = attr(calc,"stage"); }
+  s.dataType = txt(child(st,"datatype")); s.init = txt(child(st,"initialvalue"));
+  const loop = child(st,"loop");
+  if (loop){ s.loopKind = attr(loop,"type"); s.loopData = attr(loop,"data"); }
+  if (!s.loopData) s.loopData = txt(child(st,"loopdata"));
+  const exc = child(st,"exception"); if (exc){ s.excType = oneLine(attr(exc,"type")); s.excDetail = attr(exc,"detail"); }
+  const res = child(st,"resource"); if (res){ s.obj = oneLine(attr(res,"object")); s.act = oneLine(attr(res,"action")); }
+  s.calleeId = nid(txt(child(st,"processid")));
+  const readIO = (holder, list, keyAttr) => { if(holder) for (const i of kids(holder)) list.push({name:oneLine(attr(i,"name")), expr:attr(i,keyAttr), stage:attr(i,"stage")}); };
+  readIO(child(st,"inputs")||(res&&child(res,"inputs")), s.inputs, "expr");
+  readIO(child(st,"outputs")||(res&&child(res,"outputs")), s.outputs, "stage");
+  const steps = child(st,"steps");
+  if (steps) for (const c of kids(steps).filter(c=>L(c)==="calculation")) s.steps.push({expr:attr(c,"expression"), target:attr(c,"stage")});
+
+  for (const c of kids(st)) { const k=L(c); if(k in LINK_TAGS){ const t=nid(txt(c)); if(t) s.links.push({to:t,label:LINK_TAGS[k]}); } }
+  const lt = s.type.toLowerCase();
+  if ((lt==="choicestart"||lt==="waitstart"||lt==="choiceend"||lt==="waitend") ) {   // nested multi-exit stages
+    for (const d of st.getElementsByTagName("*")) {
+      if (d.parentElement===st) continue;
+      const k=L(d); if(k in LINK_TAGS){ const t=nid(txt(d)); if(t) s.links.push({to:t,label:oneLine(txt(child(d.parentElement,"name")))||LINK_TAGS[k]||"Choice"}); }
+    }
+  }
+  return s;
+}
+
+/* Pair Loop start/end stages (by 'data' = start name, else by graph walk with nesting). */
+const stageKind = s => {
+  const t=s.type.toLowerCase();
+  if(t==="loop") return (s.loopKind||"").toLowerCase()==="end" ? "loopend" : "loopstart";
+  return t;
+};
+function pairLoops(p){
+  for (const pg of p.pages){
+    const byId = new Map(pg.stages.map(s=>[s.id,s]));
+    const starts = pg.stages.filter(s=>stageKind(s)==="loopstart"), ends = pg.stages.filter(s=>stageKind(s)==="loopend");
+    const used = new Set();
+    for (const st of starts) {
+      const e = ends.find(x=>!used.has(x.id) && x.loopData && oneLine(x.loopData).toLowerCase()===st.name.toLowerCase());
+      if (e){ st.loopPair=e; e.loopPair=st; used.add(e.id); }
+    }
+    for (const st of starts) {
+      if (st.loopPair || !st.links.length) continue;
+      // DFS to the first matching end, tracking nesting depth
+      const seen = new Set(); const stack=[[st.links[0].to,0]]; let steps=0, found=null;
+      while(stack.length && !found && steps++<200000){
+        const [id,d]=stack.pop(); const k=id+"@"+d; if(seen.has(k)) continue; seen.add(k);
+        const s=byId.get(id); if(!s) continue;
+        const kd=stageKind(s); let nd=d;
+        if(kd==="loopstart") nd=d+1;
+        else if(kd==="loopend"){ if(d===0 && !used.has(s.id)){ found=s; break; } nd=d-1; if(nd<0) continue; }
+        for (let i=s.links.length-1;i>=0;i--) stack.push([s.links[i].to, nd]);
+      }
+      if (found){ st.loopPair=found; found.loopPair=st; used.add(found.id); }
+    }
+  }
+}
+
+/* ============ mapper ============ */
+const RESERVED = new Set("if then else end set to label goto run function global exit loop foreach in true false and or not mod error block on call return break continue wait while for next try catch finally stop repeat until do case switch default null nothing".split(" "));
+const sanitize = n => { const s=String(n||"").replace(/[^A-Za-z0-9_]/g,"_").replace(/_+/g,"_"); return (!s||/^\d/.test(s)) ? "v_"+s : s; };
+const q = (s, flags) => {
+  let t = String(s ?? "");
+  if (/[\r\n]/.test(t)) { t = t.replace(/\r?\n|\r/g," "); flags && flags.add("multi-line text flattened to one line"); }
+  return "'" + t.replace(/'/g,"''") + "'";
+};
+
+function buildContext(p){
+  const ctx = { p, names:new Map(), used:new Map(), loopVars:new Set(), defs:new Map(), warned:new Set(), warnings:[], vars:new Set(), pageFn:new Map(), fnNames:new Set(), pageByLeaf:new Map() };
+  // function names
+  const main = p.pages.find(pg=>/^main page$/i.test(pg.name)) || p.pages.find(pg=>pg.stages.some(s=>s.type.toLowerCase()==="start")) || p.pages[0];
+  ctx.main = main;
+  for (const pg of p.pages){
+    let base = pg===main ? "Main" : sanitize(pg.name); if(RESERVED.has(base.toLowerCase())&&pg!==main) base+="_Page"; if(base.length>60) base=base.slice(0,60); let n=base, i=2;
+    while(ctx.fnNames.has(n.toLowerCase())) n = base+"_"+(i++);
+    ctx.fnNames.add(n.toLowerCase()); pg.fn=n; pg.endLabel="End_"+n; ctx.pageFn.set(pg,n);
+  }
+  // data definitions per page
+  for (const pg of p.pages) for (const s of pg.stages){
+    const t=s.type.toLowerCase(); if(t!=="data"&&t!=="collection") continue;
+    const key=s.name.toLowerCase(); if(!ctx.defs.has(key)) ctx.defs.set(key,[]);
+    const arr=ctx.defs.get(key); if(!arr.some(x=>x.pg===pg)) arr.push({pg,name:s.name});
+  }
+  return ctx;
+}
+/* Register a PAD variable: unique (case-insensitive), not a reserved word, <= 60 chars. Never merges two different Blue Prism items. */
+function reg(ctx, identity, cand){
+  if (ctx.names.has(identity)) return ctx.names.get(identity);
+  const plain = sanitize(cand); let base = plain.slice(0,60); if (RESERVED.has(base.toLowerCase())) base += "_v";
+  let n = base, i = 2; while (ctx.used.has(n.toLowerCase())) { const suf = "_"+(i++); n = base.slice(0,60-suf.length)+suf; }
+  ctx.used.set(n.toLowerCase(), identity); ctx.names.set(identity, n);
+  if (n !== plain) ctx.warnings.push(`Variable '${oneLine(cand)}' was renamed to '${n}' in PAD (reserved word, name clash or length).`);
+  return n;
+}
+function resolveVar(ctx, pg, raw, flags){
+  raw = oneLine(raw); const dot = raw.indexOf("."); const base = dot<0 ? raw : raw.slice(0,dot), field = dot<0 ? "" : raw.slice(dot+1);
+  const key = base.toLowerCase(); const defs = ctx.defs.get(key); let out;
+  if (!defs && ctx.env && ctx.env.has(key)) { out = reg(ctx,"e|"+key, ctx.env.get(key).name); }
+  else if (!defs) { out = reg(ctx,"u|"+key,base); if(!ctx.warned.has("u:"+key)){ ctx.warned.add("u:"+key); ctx.warnings.push(`Variable '[${base}]' is used but not declared as a data item (environment/global/parameter?). Declare it in PAD.`); } }
+  else {
+    const here = defs.find(d=>d.pg===pg) || (defs.length===1 ? defs[0] : null) || defs[0];
+    if (!defs.find(d=>d.pg===pg) && defs.length>1 && !ctx.warned.has("a:"+key)) { ctx.warned.add("a:"+key); ctx.warnings.push(`Variable '[${base}]' is defined on several pages; used from a page that doesn't define it. Picked page '${here.pg.name}'.`); }
+    out = reg(ctx, "d|"+key+"|"+(defs.length>1?here.pg.id:""), defs.length>1 ? here.pg.name+"_"+here.name : here.name);
+  }
+  if (field){ flags && flags.add("collection field reference '"+raw+"' needs manual rewrite (e.g. "+out+"[idx]['"+field+"'])"); out = reg(ctx,"f|"+key+"|"+field.toLowerCase()+"|"+out, out+"_"+field); }
+  ctx.vars.add(out);
+  return out;
+}
+/* Translate a Blue Prism expression to PAD syntax (skips string literals; flags what needs review). */
+function xlate(raw, ctx, pg, flags){
+  const s=String(raw||""); let out="", plain="", i=0;
+  while(i<s.length){
+    const c=s[i];
+    if(c==='"'){
+      let j=i+1, buf="";
+      for(;;){ if(j>=s.length){ flags.add("unterminated string literal"); break; }
+        if(s[j]==='"'){ if(s[j+1]==='"'){buf+='"'; j+=2; continue;} break; }
+        buf+=s[j++]; }
+      out+=q(buf,flags); plain+="_"; i=j+1; continue;
+    }
+    if(c==='['){
+      const j=s.indexOf("]",i); if(j<0){ flags.add("unbalanced '['"); out+=c; plain+=c; i++; continue; }
+      const nm=s.slice(i+1,j); out+=resolveVar(ctx,pg,nm,flags); plain+="v"; i=j+1; continue;
+    }
+    if(c==="&"){ out+=" + "; plain+="+"; flags.add("'&' concatenation replaced by '+' (check types)"); i++; continue; }
+    if(c==="#"){ flags.add("date literal"); }
+    out+=c; plain+=c; i++;
+  }
+  if(/[A-Za-z_][A-Za-z0-9_]*\s*\(/.test(plain)) flags.add("function call needs manual mapping");
+  return out.replace(/ {2,}/g," ").trim();
+}
+
+const NONFLOW = new Set(["data","collection","note","anchor","block"]);
+const ENTRY = new Set(["start","subsheetinfo","processinfo"]);
+
+function convert(p, allProcesses, envVars){
+  allProcesses = allProcesses || [p];
+  const ctx = buildContext(p);
+  ctx.env = new Map((envVars||[]).map(v=>[v.name.toLowerCase(), v])); ctx.envLines = [];
+  const res = { process:p, ctx, pages:p.pages, actions:[], vars:ctx.vars, warnings:ctx.warnings, script:"" };
+  p.errors.forEach(e=>res.warnings.push("Parse: "+e));
+  const labels = new Map(); let li=0;
+  for (const pg of p.pages) for (const s of pg.stages) labels.set(s.id, "L_"+(li++));
+  const pageById = new Map(p.pages.map(pg=>[pg.id,pg]));
+
+  for (const pg of p.pages){
+    for (const s of pg.stages){
+      const a = { src:s, page:pg, label:labels.get(s.id), lines:[], status:"Mapped", notes:[], summary:"", init:false, flags:new Set() };
+      try { mapStage(ctx,s,pg,a,labels,pageById,allProcesses); }
+      catch(e){ a.status="Unsupported"; a.notes.push("Conversion error: "+e.message); a.lines=[`# ERROR converting stage '${s.name}': ${e.message}`, "GOTO "+pg.endLabel]; ctx.warnings.push(`Stage '${s.name}' failed: ${e.message}`); }
+      if (a.flags.size){ if(a.status==="Mapped") a.status="Partial"; a.notes.push("Review: "+[...a.flags].join("; ")); }
+      a.lines = a.lines.filter(Boolean);
+      a.summary = (a.lines.find(l=>!l.startsWith("#")&&!l.startsWith("GOTO ")) || a.lines.find(l=>l.startsWith("GOTO ")) || "(comment)").trim();
+      a.note = a.notes.join(" ");
+      res.actions.push(a);
+    }
+    // entry + reachability
+    const byId = new Map(pg.stages.map(s=>[s.id,s]));
+    let entry = pg.stages.find(s=>ENTRY.has(s.type.toLowerCase()));
+    if (!entry){
+      const hasIn = new Set(pg.stages.flatMap(s=>s.links.map(l=>l.to)));
+      entry = pg.stages.find(s=>!hasIn.has(s.id)&&!NONFLOW.has(s.type.toLowerCase())&&s.links.length) || pg.stages.find(s=>!NONFLOW.has(s.type.toLowerCase()));
+      if (entry) ctx.warnings.push(`Page '${pg.name}' has no Start stage; using '${entry.name}' as entry.`);
+    }
+    pg.entry = entry || null;
+    if (entry){
+      const seen=new Set([entry.id]), stack=[entry.id];
+      while(stack.length){ const s=byId.get(stack.pop()); if(!s) continue; for(const l of s.links) if(!seen.has(l.to)){ seen.add(l.to); stack.push(l.to);} }
+      const dead = pg.stages.filter(s=>!seen.has(s.id)&&!NONFLOW.has(s.type.toLowerCase()));
+      if (dead.length) ctx.warnings.push(`Page '${pg.name}': ${dead.length} unreachable stage(s): ${dead.slice(0,5).map(s=>"'"+s.name+"'").join(", ")}${dead.length>5?", …":""}.`);
+    }
+  }
+  for (const [key,ev] of ctx.env){
+    if (ctx.defs.has(key)) { ctx.warnings.push(`Variables file: '${ev.name}' is also a data item in the process; the process value is used.`); continue; }
+    const nm = reg(ctx,"e|"+key, ev.name); ctx.vars.add(nm);
+    const secret = ev.type==="password" || /pass(word)?|pwd|secret|token|api.?key|credential/i.test(ev.name);
+    const f = new Set(); let val;
+    if (secret){ val = "''"; ctx.warnings.push(`Variables file: '${ev.name}' looks like a secret; its value was NOT copied (set it in PAD / a credential store).`); }
+    else if (ev.type==="flag" || (ev.type==="" && /^(true|false)$/i.test(ev.value))) val = /^true$/i.test(ev.value) ? "True" : "False";
+    else if (ev.type==="number" || (ev.type==="" && /^-?\d+(\.\d+)?$/.test(ev.value))) val = /^-?\d+(\.\d+)?$/.test(ev.value) ? ev.value : "0";
+    else val = q(ev.value, f);
+    ctx.envLines.push(`SET ${nm} TO ${val}`);
+    if (f.size) ctx.warnings.push(`Variables file: '${ev.name}': ${[...f].join("; ")}.`);
+  }
+  const exceptionStages = res.actions.filter(a=>["recover","resume"].includes(a.src.type.toLowerCase()));
+  if (exceptionStages.length) ctx.warnings.push("Recover/Resume stages present: wire exception handling manually with ON BLOCK ERROR.");
+  res.script = buildScript(res, ctx);
+  res.errors = validateRobin(res.script);
+  return res;
+}
+
+function link(ctx, pg, s, label, labels, a, required){
+  const l = s.links.find(x=>x.label===label) || (label==="" ? s.links[0] : null);
+  if (!l) return null;
+  const t = pg.stages.find ? null : null;
+  if (!labels.has(l.to)) { ctx.warnings.push(`Stage '${s.name}' links to unknown stage ${l.to}.`); return null; }
+  return "GOTO "+labels.get(l.to);
+}
+function mapStage(ctx, s, pg, a, labels, pageById, allProcesses){
+  const end = "GOTO "+pg.endLabel;
+  const nextOrEnd = (label="") => { const g=link(ctx,pg,s,label,labels); if(g) return g; if(!ctx.warned.has("nl:"+s.id)){ ctx.warned.add("nl:"+s.id); ctx.warnings.push(`Stage '${s.name}' (page '${pg.name}') has no outgoing${label?" '"+label+"'":""} link; flow ends there.`);} return end; };
+  const t = stageKind(s);
+  const partial = (note) => { a.status="Partial"; a.notes.push(note); };
+  const V = n => resolveVar(ctx,pg,n,a.flags);
+  const X = e => xlate(e,ctx,pg,a.flags);
+  const isMain = pg===ctx.main;
+
+  switch(t){
+    case "start": case "subsheetinfo": case "processinfo":
+      a.lines.push(`# ${s.type}`, nextOrEnd()); break;
+    case "data": case "collection": {
+      a.init=true; const v=V(s.name), dt=(s.dataType||"").toLowerCase();
+      if (t==="collection"||dt==="collection"){ a.lines.push(`Variables.CreateNewList List=> ${v}`); if(s.init) partial("Initial collection rows are not imported; fill the list in PAD."); }
+      else if (dt==="number"){ const n=s.init===""?"0":s.init; if(/^-?\d+(\.\d+)?$/.test(n)) a.lines.push(`SET ${v} TO ${n}`); else { a.lines.push(`SET ${v} TO 0`); partial(`Initial value '${s.init}' is not numeric; set to 0.`);} }
+      else if (dt==="flag") a.lines.push(`SET ${v} TO ${s.init.toLowerCase()==="true"?"True":"False"}`);
+      else { a.lines.push(`SET ${v} TO ${q(s.init,a.flags)}`); if(dt&&!["text","password",""].includes(dt)) partial(`Data type '${s.dataType}' mapped as text; adjust the type in PAD.`); }
+      break; }
+    case "calculation":
+      if(!s.target){ partial("Calculation has no target data item."); a.lines.push("# empty target: "+oneLine(s.expr)); }
+      else a.lines.push(`SET ${V(s.target)} TO ${X(s.expr)}`);
+      a.lines.push(nextOrEnd()); break;
+    case "multiplecalculation": case "multicalc": case "multiplecalc":
+      for (const st of s.steps) a.lines.push(`SET ${V(st.target)} TO ${X(st.expr)}`);
+      if(!s.steps.length) partial("No calculation steps found.");
+      a.lines.push(nextOrEnd()); break;
+    case "decision": {
+      if(!s.expr.trim()){ partial("Decision has an empty expression."); }
+      const tl=link(ctx,pg,s,"True",labels), fl=link(ctx,pg,s,"False",labels);
+      if(!tl) partial("Decision has no True branch; flow ends there."); if(!fl) partial("Decision has no False branch; flow ends there.");
+      a.lines.push(`IF ${X(s.expr)||"False"} THEN`, "    "+(tl||end), "END", fl||end);
+      a.notes.push("Check And/Or/Not precedence and string comparisons."); break; }
+    case "action":
+      partial(`Business object action '${s.obj}.${s.act}' has no direct PAD equivalent; replace with PAD UI/web/other actions.`);
+      a.lines.push(`# TODO: replace with PAD actions for ${s.obj} > ${s.act}`);
+      s.inputs.forEach(i=>a.lines.push(`# input ${oneLine(i.name)} = ${X(i.expr)}`));
+      s.outputs.forEach(o=>{ if(o.stage) a.lines.push(`# output ${oneLine(o.name)} -> ${V(o.stage)}`); });
+      a.lines.push(nextOrEnd()); break;
+    case "subsheet": {
+      const callee = s.calleeId ? pageById.get(s.calleeId) : null;
+      if(!callee){ partial("Called page not found in this process."); a.lines.push(`# TODO: call page '${s.name}'`, nextOrEnd()); break; }
+      for (const i of s.inputs) if(i.name) a.lines.push(`SET ${resolveVar(ctx,callee,i.name,a.flags)} TO ${X(i.expr)}`);
+      a.lines.push(`RUN ${callee.fn}`);
+      for (const o of s.outputs) if(o.name&&o.stage) a.lines.push(`SET ${V(o.stage)} TO ${resolveVar(ctx,callee,o.name,a.flags)}`);
+      a.lines.push(nextOrEnd());
+      a.notes.push(`Page call → subflow '${callee.fn}' (PAD variables are global, so parameters are copied via SET).`); break; }
+    case "process": {
+      const target = allProcesses.find(x=>x!==ctx.p && ((s.calleeId&&x.id===s.calleeId) || x.name.toLowerCase()===s.name.toLowerCase() || (s.obj&&x.name.toLowerCase()===s.obj.toLowerCase())));
+      partial(target ? `Calls process '${target.name}' (included in this export): convert it separately and call it with 'Run desktop flow'.` : "Calls another process: create a PAD flow for it and call it with 'Run desktop flow'.");
+      a.lines.push(`# TODO: Run desktop flow '${target?target.name:(s.obj||s.name)}'`);
+      s.inputs.forEach(i=>a.lines.push(`# input ${oneLine(i.name)} = ${X(i.expr)}`));
+      s.outputs.forEach(o=>{ if(o.stage) a.lines.push(`# output ${oneLine(o.name)} -> ${V(o.stage)}`); });
+      a.lines.push(nextOrEnd()); break; }
+    case "loopstart": {
+      const e=s.loopPair; const coll=V(s.loopData||"");
+      if(!e){ partial("Loop start has no matching Loop end; treated as pass-through."); a.lines.push("# unpaired loop start", nextOrEnd()); break; }
+      const idx=reg(ctx,"idx|"+s.id,"Idx_"+labels.get(s.id)); ctx.loopVars.add(idx);
+      const exit = e.links.length && labels.has(e.links[0].to) ? "GOTO "+labels.get(e.links[0].to) : end;
+      ctx.vars.add(idx);
+      const row=reg(ctx,"row|"+coll,coll+"_CurrentRow"); ctx.vars.add(row);
+      partial("Loop emitted with an index counter and LABEL/GOTO; consider rewriting with 'For each'. Collection fields [Coll.Field] need manual rewrite.");
+      a.lines.push(`SET ${idx} TO 0`, `LABEL ${a.label}_t`, `IF ${idx} >= ${coll}.Count THEN`, "    "+exit, "END",
+                   `SET ${row} TO ${coll}[${idx}]`, nextOrEnd()); break; }
+    case "loopend": {
+      const st=s.loopPair;
+      if(!st){ partial("Loop end has no matching Loop start; treated as pass-through."); a.lines.push("# unpaired loop end", nextOrEnd()); break; }
+      const idx=reg(ctx,"idx|"+st.id,"Idx_"+labels.get(st.id));
+      partial("Loop counter increment; jumps back to loop start test.");
+      a.lines.push(`SET ${idx} TO ${idx} + 1`, `GOTO ${labels.get(st.id)}_t`); break; }
+    case "exception":
+      partial("Exception stage → stops the flow with an error. Use ON BLOCK ERROR / Recover handling manually if this was caught.");
+      a.lines.push(`EXIT Code: 1 ErrorMessage: ${q((s.excType?s.excType+": ":"")+s.excDetail+(s.excType||s.excDetail?"":s.name),a.flags)}`); break;
+    case "end":
+      a.lines.push(isMain ? "EXIT Code: 0" : end); break;
+    case "note": case "anchor": case "block":
+      a.lines.push(`# ${s.type}: ${s.name} ${s.narrative}`.trimEnd()); break;
+    case "recover": case "resume":
+      partial("Exception recovery has no direct equivalent; implement with ON BLOCK ERROR."); a.lines.push(`# ${s.type}`, nextOrEnd()); break;
+    case "navigate": case "read": case "write": case "waitstart": case "waitend": case "choicestart": case "choiceend": case "code": case "alert": case "skill":
+      partial(`'${s.type}' stage needs a manual PAD equivalent (UI automation / waits / custom code).`);
+      a.lines.push(`# TODO: ${s.type} '${s.name}'`);
+      if (s.links.length>1) a.lines.push("# exits: "+s.links.map(l=>(l.label||"next")+" → "+(labels.get(l.to)||"?")).join(", "));
+      a.lines.push(nextOrEnd()); break;
+    default:
+      a.status="Unsupported"; a.notes.push(`Stage type '${s.type}' is not supported yet.`);
+      a.lines.push(`# UNSUPPORTED stage type '${s.type}': ${s.name}`, nextOrEnd()); ctx.warnings.push(`Unsupported stage type '${s.type}' (stage '${s.name}').`);
+  }
+}
+
+function buildScript(res, ctx){
+  const o=[`# Converted from Blue Prism process '${oneLine(res.process.name)}'`, `# ${res.pages.length} page(s) → ${res.pages.length} subflow(s); control flow uses LABEL/GOTO`];
+  const order = [ctx.main, ...res.pages.filter(pg=>pg!==ctx.main)];
+  const idxVars = [...ctx.loopVars];
+  for (const pg of order){
+    const acts = res.actions.filter(a=>a.page===pg);
+    o.push("", `FUNCTION ${pg.fn} GLOBAL`);
+    if (pg===ctx.main){
+      o.push("# --- variable initialisation (all pages) ---");
+      res.actions.filter(a=>a.init).forEach(a=>o.push(...a.lines));
+      if(ctx.envLines.length) o.push("# --- variables from variables file ---", ...ctx.envLines);
+      if(idxVars.length) o.push("# loop counters", ...idxVars.map(v=>`SET ${v} TO 0`));
+    }
+    o.push(pg.entry ? "GOTO "+res.actions.find(a=>a.src===pg.entry).label : "GOTO "+pg.endLabel);
+    for (const a of acts.filter(a=>!a.init)){
+      o.push(`LABEL ${a.label}`, `# [${a.src.type}] ${oneLine(a.src.name)}`, ...a.lines);
+      const last=a.lines[a.lines.length-1]||"";
+      if(!/^(GOTO |EXIT)/.test(last)) o.push("GOTO "+pg.endLabel);   // never fall through into the next block
+    }
+    o.push(`LABEL ${pg.endLabel}`, "END FUNCTION");
+  }
+  return o.join("\n")+"\n";
+}
+
+
+/* ============ static validation of the generated Robin script ============ */
+const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
+function exprProblems(e){
+  let depth=0, inStr=false;
+  for(let i=0;i<e.length;i++){ const ch=e[i];
+    if(inStr){ if(ch==="'"){ if(e[i+1]==="'") i++; else inStr=false; } continue; }
+    if(ch==="'") inStr=true; else if(ch==="(") depth++; else if(ch===")"){ if(--depth<0) return "unbalanced ')'"; } }
+  if(inStr) return "unterminated text literal"; if(depth) return "unbalanced '('"; if(!e.trim()) return "empty expression"; return "";
+}
+function validateRobin(script){
+  const errs=[]; const lines=String(script).split("\n"); let fn=null, depth=0; const fns=new Map(); const gotos=[], runs=[];
+  const bad=(i,m)=>{ if(errs.length<200) errs.push(`line ${i+1}: ${m}`); };
+  lines.forEach((raw,i)=>{
+    const l=raw.trim(); if(!l||l.startsWith("#")) return; let m;
+    if((m=l.match(/^FUNCTION (\S+) GLOBAL$/))){ if(fn) bad(i,"FUNCTION inside FUNCTION"); if(!IDENT.test(m[1])) bad(i,`invalid subflow name '${m[1]}'`); if(RESERVED.has(m[1].toLowerCase())) bad(i,`subflow name '${m[1]}' is a reserved word`); if(fns.has(m[1].toLowerCase())) bad(i,`duplicate subflow '${m[1]}'`); fn={name:m[1],labels:new Set()}; fns.set(m[1].toLowerCase(),fn); depth=0; return; }
+    if(l==="END FUNCTION"){ if(!fn) bad(i,"END FUNCTION without FUNCTION"); else if(depth) bad(i,"IF without END"); fn=null; return; }
+    if(!fn){ bad(i,"statement outside a FUNCTION: "+l.slice(0,40)); return; }
+    if((m=l.match(/^LABEL (\S+)$/))){ if(!IDENT.test(m[1])) bad(i,`invalid label '${m[1]}'`); if(fn.labels.has(m[1])) bad(i,`duplicate label '${m[1]}'`); fn.labels.add(m[1]); }
+    else if((m=l.match(/^GOTO (\S+)$/))) gotos.push([fn,m[1],i]);
+    else if((m=l.match(/^RUN (\S+)$/))) runs.push([m[1],i]);
+    else if((m=l.match(/^IF (.*) THEN$/))){ if(depth) bad(i,"nested IF is not generated"); depth++; const p=exprProblems(m[1]); if(p) bad(i,"condition: "+p); }
+    else if(l==="END"){ if(!depth) bad(i,"END without IF"); else depth--; }
+    else if((m=l.match(/^SET (\S+) TO (.*)$/))){ if(!IDENT.test(m[1])) bad(i,`invalid variable name '${m[1]}'`); else if(RESERVED.has(m[1].toLowerCase())) bad(i,`variable '${m[1]}' is a reserved word`); const p=exprProblems(m[2]); if(p) bad(i,"value: "+p); }
+    else if((m=l.match(/^Variables\.CreateNewList List=> (\S+)$/))){ if(!IDENT.test(m[1])||RESERVED.has(m[1].toLowerCase())) bad(i,`invalid list name '${m[1]}'`); }
+    else if((m=l.match(/^EXIT Code: -?\d+( ErrorMessage: (.*))?$/))){ if(m[2]!==undefined){ const p=exprProblems(m[2]); if(p) bad(i,"error message: "+p); } }
+    else bad(i,"unrecognised statement: "+l.slice(0,60));
+  });
+  if(fn) errs.push("last FUNCTION is not closed with END FUNCTION");
+  if(!fns.has("main")) errs.push("no Main subflow");
+  for(const [f,t,i] of gotos) if(!f.labels.has(t)) bad(i,`GOTO to undefined label '${t}' in subflow '${f.name}'`);
+  for(const [t,i] of runs) if(!fns.has(t.toLowerCase())) bad(i,`RUN of undefined subflow '${t}'`);
+  return errs;
+}
+
+
+/* ============ variables-file parsing (JSON / CSV / TSV / XML / key=value) ============ */
+function parseVarFile(text, fname){
+  text = String(text||"").replace(/^\uFEFF/,""); const t = text.trim(); const out = [];
+  const add = (n,v,ty) => { n=oneLine(n); if(!n || n.length>200) return; out.push({name:n, value:v==null?"":(typeof v==="object"?JSON.stringify(v):String(v)), type:oneLine(ty||"").toLowerCase()}); };
+  const pick = (o,keys) => { for(const k of keys){ for(const kk of Object.keys(o)) if(kk.toLowerCase()===k && o[kk]!==undefined) return o[kk]; } return undefined; };
+  const NAME=["name","variable","key","variablename"], VAL=["value","default","initialvalue","currentvalue","val"], TYP=["type","datatype"];
+  if (!t) return null;
+  if (t[0]==="{" || t[0]==="["){
+    let j; try{ j=JSON.parse(t); }catch(e){ j=undefined; }          // not JSON (e.g. INI "[section]") → fall through to text formats
+    const walk = (x,depth=0) => {
+      if(depth>4||x==null) return;
+      if(Array.isArray(x)){ for(const it of x){ if(it&&typeof it==="object"&&!Array.isArray(it)){ const n=pick(it,NAME); if(n!==undefined) add(n,pick(it,VAL),pick(it,TYP)); else walk(it,depth+1);} } return; }
+      if(typeof x==="object"){
+        for(const k of ["variables","environmentvariables","envvars","items","values"]){ const hit=Object.keys(x).find(kk=>kk.toLowerCase()===k); if(hit && x[hit] && typeof x[hit]==="object"){ walk(x[hit],depth+1); return; } }
+        for(const [k,v] of Object.entries(x)){ if(v===null||typeof v!=="object") add(k,v,""); else if(!Array.isArray(v)&&pick(v,VAL)!==undefined) add(k,pick(v,VAL),pick(v,TYP)); }
+      }
+    };
+    if (j!==undefined){ walk(j); return out.length?out:null; }
+  }
+  if (t[0]==="<"){
+    const d=new DOMParser().parseFromString(text,"application/xml"); if(d.getElementsByTagName("parsererror").length) return null;
+    for(const el of d.getElementsByTagName("*")){
+      if(!/var|param|setting|config|item|entry|add/i.test(el.localName)) continue;
+      const a=n=>{ for(const at of el.attributes) if(at.name.toLowerCase()===n) return at.value; const c=[...el.children].find(x=>x.localName.toLowerCase()===n); return c?c.textContent:undefined; };
+      const n=NAME.map(a).find(x=>x!==undefined), v=VAL.map(a).find(x=>x!==undefined), ty=TYP.map(a).find(x=>x!==undefined);
+      if(n!==undefined && v!==undefined) add(n,v,ty);
+    }
+    return out.length?out:null;
+  }
+  const lines = text.split(/\r?\n/).filter(l=>l.trim()&&!/^\s*([#;]|\/\/)/.test(l)).slice(0,200000); if(!lines.length) return null;
+  const delim = [",",";","\t"].map(dl=>[dl,(lines[0].match(new RegExp(dl==="\t"?"\t":"\\"+dl,"g"))||[]).length]).sort((a,b)=>b[1]-a[1])[0];
+  if(delim[1]>0){
+    const split=l=>{ const r=[]; let cur="",q=false; for(let i=0;i<l.length;i++){ const ch=l[i]; if(q){ if(ch==='"'){ if(l[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=ch; } else if(ch==='"') q=true; else if(ch===delim[0]){ r.push(cur); cur=""; } else cur+=ch; } r.push(cur); return r; };
+    const rows=lines.map(split); const head=rows[0].map(h=>h.trim().toLowerCase());
+    const ni=head.findIndex(h=>NAME.includes(h)), vi=head.findIndex(h=>VAL.includes(h)), ti=head.findIndex(h=>TYP.includes(h));
+    if(ni>=0){ for(const r of rows.slice(1)) if(r[ni]!==undefined) add(r[ni], vi>=0?r[vi]:"", ti>=0?r[ti]:""); }
+    else if(rows.every(r=>r.length>=2&&r.length<=3)) for(const r of rows) add(r[0],r[1],r[2]);
+    return out.length?out:null;
+  }
+  let hits=0; for(const l of lines){ const m=l.match(/^\s*([A-Za-z_][\w. -]*?)\s*[=:]\s*(.*)$/); if(m){ hits++; add(m[1],m[2].replace(/^(["'])(.*)\1$/,"$2"),""); } }
+  return hits>=Math.max(1,lines.length*0.6) ? out : null;
+}
+
+/* ============ diagram (SVG, layered layout, cycle-safe) ============ */
+const W=170,H=56,GX=36,GY=54,M=30;
+function layout(nodes, edges, entryId){
+  const idx=new Set(nodes.map(n=>n.id)), out=new Map(), inc=new Set();
+  for(const e of edges){ if(!idx.has(e.from)||!idx.has(e.to)) continue; if(!out.has(e.from)) out.set(e.from,[]); out.get(e.from).push(e.to); inc.add(e.to); }
+  const iso=new Set(nodes.filter(n=>!out.has(n.id)&&!inc.has(n.id)&&n.id!==entryId).map(n=>n.id));
+  const roots=[]; if(entryId&&idx.has(entryId)) roots.push(entryId);
+  for(const n of nodes) if(!iso.has(n.id)&&!inc.has(n.id)&&n.id!==entryId) roots.push(n.id);
+  for(const n of nodes) if(!iso.has(n.id)) roots.push(n.id);          // pure cycles
+  const lvl=new Map(), rows=new Map(), rects={};
+  const place=(id,l)=>{ lvl.set(id,l); const c=rows.get(l)||0; rows.set(l,c+1); rects[id]={x:M+c*(W+GX), y:M+l*(H+GY)}; };
+  let maxL=-1;
+  for(const r of roots){ if(lvl.has(r)) continue; place(r,0); const q=[r]; let h=0;
+    while(h<q.length){ const c=q[h++]; for(const t of (out.get(c)||[])) if(!lvl.has(t)){ place(t,lvl.get(c)+1); q.push(t); } } }
+  for(const v of lvl.values()) if(v>maxL) maxL=v;
+  let u=0; const per=5, baseY=M+(maxL+2)*(H+GY);
+  for(const n of nodes) if(iso.has(n.id)){ lvl.set(n.id,maxL+2+Math.floor(u/per)); rects[n.id]={x:M+(u%per)*(W+GX), y:baseY+Math.floor(u/per)*(H+20)}; u++; }
+  let width=0,height=0; for(const k in rects){ const r=rects[k]; if(r.x>width)width=r.x; if(r.y>height)height=r.y; }
+  return {rects,lvl,width:width+W+M+90,height:height+H+M};
+}
+function renderDiagram(host, nodes, edges, entryId, onClick){
+  if(!nodes.length){ host.innerHTML='<div class="empty">No stages on this page.</div>'; return; }
+  const {rects,lvl,width,height}=layout(nodes,edges,entryId);
+  const parts=[`<svg xmlns="http://www.w3.org/2000/svg" data-w="${width}" data-h="${height}" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--edge)"/></marker></defs>`];
+  const pairCount=new Map();
+  for(const e of edges){
+    const a=rects[e.from], b=rects[e.to]; if(!a||!b) continue;
+    const key=e.from+">"+e.to, k=pairCount.get(key)||0; pairCount.set(key,k+1);
+    let d,mx,my;
+    if(e.from===e.to){ const x=a.x+W,y=a.y+H/2; d=`M${x} ${y-8}C${x+46+k*10} ${y-34} ${x+46+k*10} ${y+34} ${x} ${y+8}`; mx=x+40+k*10; my=y; }
+    else if(lvl.get(e.to)>lvl.get(e.from)){ const x1=a.x+W/2+k*12,y1=a.y+H,x2=b.x+W/2+k*12,y2=b.y; d=`M${x1} ${y1}C${x1} ${y1+28} ${x2} ${y2-28} ${x2} ${y2}`; mx=(x1+x2)/2; my=(y1+y2)/2; }
+    else { const x1=a.x+W,y1=a.y+H/2+k*6,x2=b.x+W,y2=b.y+H/2+k*6,off=45+Math.min(40,Math.abs(lvl.get(e.from)-lvl.get(e.to))*5)+k*8; d=`M${x1} ${y1}C${x1+off} ${y1} ${x2+off} ${y2} ${x2} ${y2}`; mx=Math.max(x1,x2)+off*.75; my=(y1+y2)/2; }
+    parts.push(`<path d="${d}" fill="none" stroke="var(--edge)" stroke-width="1.6" marker-end="url(#ar)"/>`);
+    if(e.label) parts.push(`<text x="${mx+4}" y="${my}" font-size="11" style="fill:${e.label==="False"?"var(--f)":e.label==="True"?"var(--t)":"var(--muted)"}">${esc(e.label)}</text>`);
+  }
+  const clip=s=>{s=String(s||"");return s.length>26?s.slice(0,25)+"…":s;};
+  for(const n of nodes){ const r=rects[n.id]; if(!r) continue;
+    parts.push(`<g class="node" data-id="${esc(n.id)}"><title>${esc(n.title)} — ${esc(n.sub)}</title>`);
+    if(n.diamond){ const cx=r.x+W/2, cy=r.y+H/2; parts.push(`<polygon points="${cx},${r.y} ${r.x+W},${cy} ${cx},${r.y+H} ${r.x},${cy}" fill="${n.fill}" stroke="var(--stroke)"/>`); }
+    else parts.push(`<rect x="${r.x}" y="${r.y}" width="${W}" height="${H}" rx="10" fill="${n.fill}" stroke="var(--stroke)"/>`);
+    parts.push(`<text x="${r.x+W/2}" y="${r.y+H/2-4}" text-anchor="middle" font-size="13" font-weight="600">${esc(clip(n.title))}</text><text x="${r.x+W/2}" y="${r.y+H/2+13}" text-anchor="middle" font-size="11" style="fill:var(--muted)">${esc(clip(n.sub))}</text></g>`);
+  }
+  parts.push("</svg>");
+  host.innerHTML=parts.join("");
+  host.querySelectorAll(".node").forEach(g=>g.addEventListener("click",()=>onClick(g.dataset.id)));
+  applyZoom(host);
+}
+let zoom=1;
+function applyZoom(host){ const s=host.querySelector("svg"); if(!s) return; s.setAttribute("width",Math.round(s.dataset.w*zoom)); s.setAttribute("height",Math.round(s.dataset.h*zoom)); }
+function zoomAll(){ applyZoom($("svgIn")); applyZoom($("svgOut")); const z=$("zl"); if(z) z.textContent=Math.round(zoom*100)+"%"; }
+function fitZoom(){
+  const host=$("p-in").classList.contains("on")?$("svgIn"):$("svgOut"); const s=host.querySelector("svg"); if(!s||!host.clientWidth) return;
+  zoom=Math.max(0.05,Math.min(1,(host.clientWidth-4)/s.dataset.w)); zoomAll();
+}
+document.querySelectorAll(".zoom button").forEach(b=>b.addEventListener("click",()=>{
+  const z=b.dataset.z; if(z==="+") zoom=Math.min(3,zoom*1.25); else if(z==="-") zoom=Math.max(0.05,zoom/1.25); else if(z==="1") zoom=1; else return fitZoom(); zoomAll(); }));
+
+/* ============ app state / UI ============ */
+let processes=[], current=null, currentPage=null, pkg=null, envVars=[];
+const sw = {Mapped:"var(--ok)",Partial:"var(--warn)",Unsupported:"var(--bad)"};
+const edgesOf = pg => pg.stages.flatMap(s=>s.links.map(l=>({from:s.id,to:l.to,label:l.label})));
+
+function renderPage(){
+  if(!current||!currentPage) return;
+  const pg=currentPage, entry=pg.entry?pg.entry.id:null;
+  renderDiagram($("svgIn"), pg.stages.map(s=>({id:s.id,title:s.name,sub:s.type,fill:"var(--in)",diamond:s.type.toLowerCase()==="decision"})), edgesOf(pg), entry, selectStage);
+  const acts=current.actions.filter(a=>a.page===pg);
+  renderDiagram($("svgOut"), acts.map(a=>({id:a.src.id,title:a.src.name,sub:a.summary,fill:sw[a.status],diamond:a.src.type.toLowerCase()==="decision"})), edgesOf(pg), entry, selectStage);
+  $("detail").innerHTML="";
+}
+function showConverted(){
+  const p = processes[+$("procSel").value];
+  try{
+    current = convert(p, processes, envVars);
+    const ps=$("pageSel"); ps.innerHTML=current.pages.map((pg,i)=>`<option value="${i}">${esc(pg.name)} → ${esc(pg.fn)} (${pg.stages.length})</option>`).join("");
+    ps.hidden=current.pages.length<2; ps.value=String(current.pages.indexOf(current.ctx.main)); currentPage=current.pages[+ps.value];
+    const frag=document.createDocumentFragment(), tb=$("tbl").tBodies[0]; tb.innerHTML="";
+    for(const a of current.actions){
+      const tr=document.createElement("tr"); tr.dataset.id=a.src.id;
+      tr.innerHTML=`<td>${esc(a.page.name)}</td><td>${esc(a.src.name)}</td><td>${esc(a.src.type)}</td><td>${a.init?"(init)":esc(a.label)}</td><td><code>${esc(a.summary)}</code></td><td class="${a.status}">${a.status}</td><td>${esc(a.note)}</td>`;
+      tr.addEventListener("click",()=>selectStage(a.src.id,true)); frag.appendChild(tr);
+    }
+    tb.appendChild(frag);
+    $("script").textContent=current.script;
+    const c=k=>current.actions.filter(a=>a.status===k).length;
+    $("stats").textContent=`${p.name}: ${current.pages.length} page(s), ${current.actions.length} stages → ${c("Mapped")} mapped, ${c("Partial")} need review, ${c("Unsupported")} unsupported · ${current.vars.size} PAD variables`;
+    current.warnings.forEach(w=>log("WARN: "+w,"w")); log("Converted: "+$("stats").textContent);
+    ["zipBtn","robinBtn","copyBtn","bundleBtn"].forEach(id=>$(id).disabled=false);
+    renderReadiness();
+    renderPage();
+  }catch(e){ current=null; renderReadiness(); ["zipBtn","robinBtn","copyBtn","bundleBtn"].forEach(id=>$(id).disabled=true); log("ERROR: Conversion failed: "+e.message,"e"); alert("Conversion failed: "+e.message); }
+}
+function selectStage(id){
+  const a=current && current.actions.find(x=>x.src.id===id); if(!a) return;
+  document.querySelectorAll("#tbl tr.sel").forEach(r=>r.classList.remove("sel"));
+  for(const r of $("tbl").tBodies[0].rows) if(r.dataset.id===id){ r.classList.add("sel"); break; }
+  $("detail").innerHTML=`<div class="card"><b>${esc(a.src.name)}</b> <span class="sub">(${esc(a.src.type)}, page '${esc(a.page.name)}') → ${a.status}</span>
+    ${a.note?`<div>${esc(a.note)}</div>`:""}<pre style="margin-top:8px;max-height:200px">${esc(a.lines.join("\n")||"(no output)")}</pre></div>`;
+}
+
+/* ---- file loading: UTF-8 / UTF-16 / BOM / gzip; rejects ZIP ---- */
+async function decodeBytes(buf){
+  let u8=new Uint8Array(buf);
+  if(u8.length>=2 && u8[0]===0x1f && u8[1]===0x8b){
+    if(typeof DecompressionStream==="undefined") throw new ConversionError("This file is gzip-compressed and this browser cannot decompress it.");
+    u8=new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer());
+  }
+  if(u8.length>=4 && u8[0]===0x50 && u8[1]===0x4b) throw new ConversionError("This file is itself a ZIP archive, not a Blue Prism export.");
+  let enc="utf-8";
+  if(u8.length>=2 && u8[0]===0xff && u8[1]===0xfe) enc="utf-16le"; else if(u8.length>=2 && u8[0]===0xfe && u8[1]===0xff) enc="utf-16be";
+  return new TextDecoder(enc).decode(u8);
+}
+function setProcesses(list, labelFiles){
+  processes=list;
+  const sel=$("procSel"); sel.innerHTML=processes.map((p,i)=>`<option value="${i}">${esc(p.name)}${labelFiles&&p.file?" — "+esc(p.file.split("/").pop()):""} (${p.stages.length} stages)</option>`).join("");
+  sel.hidden=processes.length<2; sel.value="0";
+  log(`Found ${processes.length} process/object definition(s).`);
+  showConverted();
+}
+function loadText(text, name){
+  try{
+    log("Parsing "+name); pkg=null; envVars=[]; renderPackage();
+    const ps=parseBp(text); ps.forEach(p=>p.file=name); setProcesses(ps,false);
+  }catch(e){
+    const m = e instanceof ConversionError ? e.message : "Unexpected error while reading the file: "+e.message;
+    log("ERROR: "+m,"e"); alert(m);
+  }
+}
+
+/* ---- ZIP package input ---- */
+const ZIP_LIMITS={entries:5000, total:300*1024*1024, perFile:150*1024*1024};
+const BP_EXT=/\.(bprelease|bpprocess|bpobject)$/i, VAR_EXT=/\.(json|csv|tsv|xml|txt|env|ini|properties|cfg|conf)$/i, VAR_NAME=/(variable|envvar|environment|\benv\b|param|config|setting|credential)/i;
+const cleanPath = p => String(p).replace(/\\/g,"/").split("/").filter(s=>s&&s!=="."&&s!=="..").join("/").replace(/^[A-Za-z]:/,"").replace(/[\u0000-\u001f]/g,"") || "file";
+async function loadZip(f, buf){
+  log("Opening ZIP "+f.name);
+  let zip; try{ zip=await JSZip.loadAsync(buf); }catch(e){ throw new ConversionError("Could not open the ZIP ("+oneLine(e.message)+"). It may be corrupt or password-protected."); }
+  const all=Object.values(zip.files).filter(e=>!e.dir && !/(^|\/)(__MACOSX|\.DS_Store|Thumbs\.db|desktop\.ini)(\/|$)/i.test(e.name) && !/(^|\/)~\$/.test(e.name));
+  if(all.length>ZIP_LIMITS.entries) throw new ConversionError(`The ZIP has ${all.length} files (limit ${ZIP_LIMITS.entries}).`);
+  let total=0; for(const e of all){ const sz=(e._data&&e._data.uncompressedSize)||0; if(sz>ZIP_LIMITS.perFile) throw new ConversionError(`'${cleanPath(e.name)}' is larger than ${ZIP_LIMITS.perFile/1048576} MB when extracted.`); total+=sz; }
+  if(total>ZIP_LIMITS.total) throw new ConversionError(`The ZIP expands to more than ${ZIP_LIMITS.total/1048576} MB; refusing to open it (zip-bomb protection).`);
+  const P={zipName:f.name, zip, bp:[], vars:[], att:[]}, procs=[]; let readBytes=0;
+  const rd = async e => { const b=await e.async("uint8array"); readBytes+=b.length; if(b.length>ZIP_LIMITS.perFile||readBytes>ZIP_LIMITS.total) throw new ConversionError("The ZIP expands to more data than allowed; refusing to open it (zip-bomb protection)."); return b; };
+  for(const e of all){
+    const path=cleanPath(e.name); let isBp=BP_EXT.test(path);
+    if(!isBp && /\.xml$/i.test(path)){ try{ const head=new TextDecoder().decode((await rd(e)).subarray(0,4096)); isBp=/<(?:[\w.-]+:)?(release|process|object)[\s>]/i.test(head); }catch(_){} }
+    if(isBp){
+      try{ const text=await decodeBytes(await rd(e)); const ps=parseBp(text); ps.forEach(p=>p.file=path); procs.push(...ps); P.bp.push({path,n:ps.length}); log(`  ${path}: ${ps.length} process/object definition(s)`); }
+      catch(err){ if(/zip-bomb/.test(err.message)) throw err; const m=err.message; log(`  ${path}: skipped — ${m}`,"e"); P.bp.push({path,n:0,error:m}); }
+    } else if(VAR_EXT.test(path)){
+      let list=null; try{ if((e._data&&e._data.uncompressedSize||0)<=20*1048576) list=parseVarFile(await decodeBytes(await rd(e)), path); }catch(err){ if(/zip-bomb/.test(err.message)) throw err; }
+      P.vars.push({path,list,mode: list && VAR_NAME.test(path) ? "vars" : "att", size:(e._data&&e._data.uncompressedSize)||0, entry:e});
+    } else P.att.push({path,size:(e._data&&e._data.uncompressedSize)||0,entry:e, nested:/\.(zip|7z|rar|gz|tar)$/i.test(path)});
+  }
+  if(!procs.length) throw new ConversionError(`No Blue Prism files (.bprelease, .bpprocess, .bpobject) were found in the ZIP. It contains ${all.length} file(s)${all.length?": "+all.slice(0,5).map(e=>cleanPath(e.name)).join(", ")+(all.length>5?", …":""):""}.`);
+  pkg=P; envVars=collectEnv(); renderPackage(); setProcesses(procs,true);
+}
+function collectEnv(){
+  if(!pkg) return []; const m=new Map();
+  for(const v of pkg.vars) if(v.mode==="vars"&&v.list) for(const x of v.list){ const k=x.name.toLowerCase(); if(!m.has(k)) m.set(k,x); }
+  return [...m.values()];
+}
+function renderPackage(){
+  const box=$("pkg"); if(!pkg){ box.hidden=true; return; }
+  box.hidden=false;
+  const nAtt=pkg.att.length+pkg.vars.filter(v=>v.mode==="att").length;
+  $("pkgSum").textContent=`Package '${pkg.zipName}': ${pkg.bp.filter(b=>b.n).length} Blue Prism file(s), ${envVars.length} variable(s) imported, ${nAtt} attachment(s)`;
+  const row=(a,b,c)=>`<tr><td>${a}</td><td>${b}</td><td>${c}</td></tr>`;
+  let h='<table><thead><tr><th>File</th><th>Role</th><th>Details</th></tr></thead><tbody>';
+  for(const b of pkg.bp) h+=row(esc(b.path), "Blue Prism", b.error?`<span style="color:var(--err)">skipped: ${esc(b.error)}</span>`:`${b.n} definition(s)`);
+  pkg.vars.forEach((v,i)=>{ h+=row(esc(v.path), v.list?`<select data-i="${i}"><option value="vars"${v.mode==="vars"?" selected":""}>Variables</option><option value="att"${v.mode==="att"?" selected":""}>Attachment</option></select>`:"Attachment", v.list?`${v.list.length} name/value pair(s) recognised`:"not a recognised variables format"); });
+  for(const a of pkg.att) h+=row(esc(a.path),"Attachment",(a.size/1024).toFixed(1)+" KB"+(a.nested?" · nested archive (not expanded)":""));
+  $("pkgBody").innerHTML=h+"</tbody></table>";
+  $("pkgBody").querySelectorAll("select").forEach(s=>s.addEventListener("change",()=>{ pkg.vars[+s.dataset.i].mode=s.value; envVars=collectEnv(); renderPackage(); if(processes.length) showConverted(); }));
+}
+async function loadFile(f){
+  try{
+    if(f.size>ZIP_LIMITS.total) throw new ConversionError("File is larger than "+ZIP_LIMITS.total/1048576+" MB.");
+    const buf=await f.arrayBuffer(), u8=new Uint8Array(buf,0,Math.min(4,buf.byteLength));
+    if(u8.length>=4 && u8[0]===0x50 && u8[1]===0x4b){ if(typeof JSZip==="undefined") throw new ConversionError("ZIP support failed to load (JSZip)."); await loadZip(f,buf); }
+    else loadText(await decodeBytes(buf), f.name);
+  }catch(e){ const m=e instanceof ConversionError?e.message:"Could not read the file: "+e.message; log("ERROR: "+m,"e"); alert(m); }
+}
+$("file").addEventListener("change", e=>{ const f=e.target.files[0]; if(f) loadFile(f); e.target.value=""; });
+$("procSel").addEventListener("change", showConverted);
+$("pageSel").addEventListener("change", ()=>{ currentPage=current.pages[+$("pageSel").value]; renderPage(); });
+function showTab(t){
+  document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x.dataset.t===t));
+  ["in","map","out","script"].forEach(k=>$("p-"+k).classList.toggle("on",k===t)); zoomAll();
+}
+document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.t)));
+
+/* ============ export ============ */
+async function saveFile(filename, data){
+  let dl=null; try{ dl = window.claude ? await claude.use("downloads") : null; }catch(_){}
+  if(!dl){ log("Saving is unavailable in this view; use 'Copy script' instead.","w"); alert("Saving files isn't available here. Use 'Copy script' instead."); return false; }
+  try{ await dl.save({filename,data}); log("Saved "+filename); return true; }
+  catch(e){ if(e&&e.code!=="declined"){ log("ERROR saving: "+(e.message||e.code),"e"); alert("Could not save: "+(e.message||e.code)); } return false; }
+}
+const safeName = () => (current.process.name.replace(/[^A-Za-z0-9]/g,"")||"ConvertedFlow").slice(0,60);
+const guid = () => (crypto.randomUUID ? crypto.randomUUID() : "xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx".replace(/x/g,()=>(Math.random()*16|0).toString(16)));
+const xe = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[c]));
+
+const GUID_BRACED=/^\{[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\}$/;
+const cleanName = s => oneLine(s).replace(/[\u0000-\u001f\u007f]/g,"").slice(0,100) || "Converted flow";
+
+/* Build every file of the solution package as text (so it can be validated before zipping). */
+function buildParts(r){
+  const id=guid(), ID=id.toUpperCase(), name=(r.process.name.replace(/[^A-Za-z0-9]/g,"")||"ConvertedFlow").slice(0,50), disp=xe(cleanName(r.process.name));
+  const files={};
+  files["[Content_Types].xml"]='<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/octet-stream" /><Default Extension="json" ContentType="application/octet-stream" /></Types>';
+  files["solution.xml"]=`<?xml version="1.0" encoding="utf-8"?><ImportExportXml version="9.2.0.0" SolutionPackageVersion="9.2"><SolutionManifest><UniqueName>BpToPad_${name}</UniqueName><LocalizedNames><LocalizedName description="BP to PAD - ${disp}" languagecode="1033" /></LocalizedNames><Descriptions /><Version>1.0.0.0</Version><Managed>0</Managed><Publisher><UniqueName>bp2pad</UniqueName><LocalizedNames><LocalizedName description="bp2pad" languagecode="1033" /></LocalizedNames><Descriptions /><EMailAddress /><SupportingWebsiteUrl /><CustomizationPrefix>bp2pad</CustomizationPrefix><CustomizationOptionValuePrefix>10000</CustomizationOptionValuePrefix></Publisher><RootComponents><RootComponent type="29" id="{${id}}" behavior="0" /></RootComponents><MissingDependencies /></SolutionManifest></ImportExportXml>`;
+  files["customizations.xml"]=`<?xml version="1.0" encoding="utf-8"?><ImportExportXml><Entities /><Roles /><Workflows><Workflow WorkflowId="{${id}}" Name="${disp}"><JsonFileName>/Workflows/${name}-${ID}.json</JsonFileName><Type>1</Type><Subprocess>0</Subprocess><Category>6</Category><Mode>0</Mode><Scope>4</Scope><OnDemand>0</OnDemand><TriggerOnCreate>0</TriggerOnCreate><TriggerOnDelete>0</TriggerOnDelete><AsyncAutodelete>0</AsyncAutodelete><SyncWorkflowLogOnFailure>0</SyncWorkflowLogOnFailure><StateCode>0</StateCode><StatusCode>1</StatusCode><RunAs>1</RunAs><IsTransacted>1</IsTransacted><IntroducedVersion>1.0</IntroducedVersion><IsCustomizable>1</IsCustomizable><LocalizedNames><LocalizedName languagecode="1033" description="${disp}" /></LocalizedNames></Workflow></Workflows><Languages><Language>1033</Language></Languages></ImportExportXml>`;
+  files[`Workflows/${name}-${ID}.json`]=JSON.stringify({properties:{definition:{contentVersion:"1.0.0.0",actions:{}},connectionReferences:{},robinScript:r.script},schemaVersion:"1.0.0.0"},null,2);
+  files[`${name}.robin.txt`]=r.script;
+  files["conversion-report.txt"]=["Warnings:",...r.warnings.map(w=>"- "+w),"","Stages:",...r.actions.map(a=>`${a.status.padEnd(11)} [${a.page.name}] ${a.src.type}: ${a.src.name} ${a.note?"| "+a.note:""}`)].join("\n");
+  return {files,id,name};
+}
+
+/* Package-level validation: everything we can verify without PAD itself. */
+function validatePackage(parts, r){
+  const E=[], Wn=[], f=parts.files, dp=new DOMParser(), docs={};
+  for(const n of ["[Content_Types].xml","solution.xml","customizations.xml"]){
+    if(!(n in f)){ E.push("missing file: "+n); continue; }
+    const d=dp.parseFromString(f[n],"application/xml"); if(d.getElementsByTagName("parsererror").length){ E.push(n+" is not well-formed XML"); continue; } docs[n]=d;
+  }
+  const wfPaths=Object.keys(f).filter(n=>/^Workflows\/[^\/]+\.json$/.test(n)); if(!wfPaths.length) E.push("no Workflows/*.json file");
+  for(const n of Object.keys(f)) if(/[\\:*?"<>|]/.test(n.replace(/^\[Content_Types\]\.xml$/,""))||n.startsWith("/")) E.push("illegal character in package path: "+n);
+  const t=(d,sel)=>{ const e=d&&d.querySelector(sel); return e?e.textContent.trim():null; };
+  const ct=docs["[Content_Types].xml"];
+  if(ct){ const ext=[...ct.getElementsByTagName("Default")].map(e=>(e.getAttribute("Extension")||"").toLowerCase()); for(const need of ["xml","json"]) if(!ext.includes(need)) E.push("[Content_Types].xml has no Default for ."+need); }
+  const sx=docs["solution.xml"];
+  if(sx){
+    const un=t(sx,"SolutionManifest > UniqueName"); if(!un||!/^[A-Za-z_][A-Za-z0-9_]{0,64}$/.test(un)) E.push("solution UniqueName invalid: "+un);
+    if(!/^\d+(\.\d+){3}$/.test(t(sx,"SolutionManifest > Version")||"")) E.push("solution Version must look like 1.0.0.0");
+    if(t(sx,"SolutionManifest > Managed")!=="0") E.push("solution must be unmanaged (Managed=0)");
+    const pu=t(sx,"Publisher > UniqueName"); if(!pu||!/^[A-Za-z_][A-Za-z0-9_]*$/.test(pu)) E.push("publisher UniqueName invalid: "+pu);
+    const pre=t(sx,"Publisher > CustomizationPrefix")||""; if(!/^[a-z][a-z0-9]{1,7}$/.test(pre)||pre.startsWith("mscrm")) E.push("publisher CustomizationPrefix must be 2-8 lowercase letters/digits, start with a letter, not 'mscrm': "+pre);
+    const ov=+(t(sx,"Publisher > CustomizationOptionValuePrefix")||0); if(!(ov>=10000&&ov<=99999)) E.push("CustomizationOptionValuePrefix must be 10000-99999");
+    const roots=[...sx.getElementsByTagName("RootComponent")]; if(!roots.length) E.push("solution has no RootComponent");
+    for(const rc of roots){ if(rc.getAttribute("type")!=="29") E.push("RootComponent type must be 29 (workflow)"); if(!GUID_BRACED.test(rc.getAttribute("id")||"")) E.push("RootComponent id is not a {GUID}"); }
+    var rootIds=roots.map(x=>(x.getAttribute("id")||"").toLowerCase());
+  }
+  const cx=docs["customizations.xml"];
+  if(cx){
+    const wfs=[...cx.getElementsByTagName("Workflow")]; if(!wfs.length) E.push("customizations.xml has no Workflow");
+    const seen=new Set();
+    for(const w of wfs){
+      const wid=(w.getAttribute("WorkflowId")||"").toLowerCase(), nm=w.getAttribute("Name")||"";
+      if(!GUID_BRACED.test(wid)) E.push("WorkflowId is not a {GUID}: "+wid); if(seen.has(wid)) E.push("duplicate WorkflowId"); seen.add(wid);
+      if(rootIds && !rootIds.includes(wid)) E.push("WorkflowId "+wid+" is not listed as a RootComponent in solution.xml");
+      if(!nm.trim()||nm.length>100) E.push("workflow Name must be 1-100 characters");
+      const jf=(w.querySelector("JsonFileName")||{}).textContent||""; const key=jf.replace(/^\//,"");
+      if(!jf.startsWith("/Workflows/")||!(key in f)) E.push("JsonFileName does not point to a file in the package: "+jf);
+      else if(!key.toLowerCase().includes(wid.replace(/[{}]/g,""))) E.push("JsonFileName does not contain the WorkflowId");
+      if((w.querySelector("Category")||{}).textContent!=="6") E.push("Workflow Category must be 6 (desktop flow)");
+      if(!w.querySelector("LocalizedNames LocalizedName")) E.push("workflow has no LocalizedName");
+    }
+    if(![...cx.getElementsByTagName("Language")].some(l=>l.textContent.trim()==="1033")) E.push("customizations.xml must list language 1033");
+  }
+  for(const p of wfPaths){ try{ const j=JSON.parse(f[p]); if(!j.properties||!j.properties.definition) E.push(p+": missing properties.definition"); if(typeof j.schemaVersion!=="string") E.push(p+": missing schemaVersion"); if(!j.properties||j.properties.robinScript!==r.script) E.push(p+": embedded script differs from generated script"); }catch(e){ E.push(p+" is not valid JSON"); } }
+  for(const e of validateRobin(r.script)) E.push("script: "+e);
+  const total=Object.values(f).reduce((s,x)=>s+x.length,0); if(total>16*1024*1024) E.push("package is larger than 16 MB");
+  if(r.actions.some(a=>a.status==="Partial"||a.status==="Unsupported")) Wn.push(r.actions.filter(a=>a.status!=="Mapped").length+" stage(s) are placeholders/need manual work in PAD (see Mapping tab).");
+  Wn.push("The desktop-flow JSON schema is undocumented by Microsoft; if PAD rejects the .zip, paste the .robin.txt into the PAD designer.");
+  return {errors:E, warnings:Wn};
+}
+
+function renderReadiness(){
+  const box=$("ready"); if(!current){ box.textContent=""; return; }
+  const v=validatePackage(buildParts(current),current); current.pkg=v;
+  const errs=[...v.errors];
+  box.innerHTML = errs.length
+    ? `<div class="e"><b>✖ ${errs.length} validation error(s) — .zip export blocked:</b><ul>${errs.slice(0,8).map(e=>`<li>${esc(e)}</li>`).join("")}${errs.length>8?`<li>… ${errs.length-8} more (see log)</li>`:""}</ul></div>`
+    : `<div class="o">✔ Package validation passed (structure, GUIDs, names, script syntax).</div>`;
+  errs.forEach(e=>log("VALIDATION: "+e,"e"));
+  $("zipBtn").disabled = errs.length>0;
+}
+
+async function exportZip(){
+  if(!current) return;
+  if(typeof JSZip==="undefined"){ alert("ZIP library failed to load."); log("ERROR: JSZip not loaded","e"); return; }
+  try{
+    const parts=buildParts(current), v=validatePackage(parts,current);
+    if(v.errors.length){ v.errors.forEach(e=>log("VALIDATION: "+e,"e")); alert("Export blocked: "+v.errors.length+" validation error(s). See the readiness panel."); return; }
+    const z=new JSZip(); for(const [n,c] of Object.entries(parts.files)) z.file(n,c);
+    const blob=await z.generateAsync({type:"blob",compression:"DEFLATE"});
+    // round-trip check: re-open the finished zip and compare every file
+    const back=await JSZip.loadAsync(blob); const names=Object.keys(back.files).filter(n=>!back.files[n].dir);
+    const want=Object.keys(parts.files);
+    if(names.length!==want.length||!want.every(n=>names.includes(n))) throw new Error("zip round-trip check failed: file list differs");
+    for(const n of want) if(await back.file(n).async("string")!==parts.files[n]) throw new Error("zip round-trip check failed for "+n);
+    v.warnings.forEach(w=>log("NOTE: "+w,"w"));
+    await saveFile(safeName()+".zip", blob);
+  }catch(e){ log("ERROR: "+e.message,"e"); alert("Export failed: "+e.message); }
+}
+async function exportBundle(){
+  if(!processes.length||typeof JSZip==="undefined") return;
+  try{
+    const out=new JSZip(); let okN=0, blockedN=0;
+    const rep=["Blue Prism -> PAD bundle","Source: "+(pkg?pkg.zipName:(processes[0].file||"file")),"Generated: "+new Date().toISOString(),""];
+    log("Bundling "+processes.length+" process(es)...");
+    for(let i=0;i<processes.length;i++){
+      const p=processes[i], r=convert(p,processes,envVars), parts=buildParts(r), v=validatePackage(parts,r);
+      const base=String(i+1).padStart(2,"0")+"_"+((p.name.replace(/[^A-Za-z0-9]/g,"")||"flow").slice(0,40));
+      out.file("scripts/"+base+".robin.txt", r.script);
+      out.file("reports/"+base+".txt", parts.files["conversion-report.txt"]+(v.errors.length?"\n\nVALIDATION ERRORS:\n"+v.errors.map(e=>"- "+e).join("\n"):""));
+      if(v.errors.length){ blockedN++; rep.push("BLOCKED  "+p.name+" ["+(p.file||"")+"] - "+v.errors.length+" validation error(s): "+v.errors.slice(0,3).join(" | ")); }
+      else {
+        const z=new JSZip(); for(const [n,c] of Object.entries(parts.files)) z.file(n,c);
+        out.file("solutions/"+base+".zip", await z.generateAsync({type:"uint8array",compression:"DEFLATE"}));
+        okN++; rep.push("OK       "+p.name+" ["+(p.file||"")+"] -> solutions/"+base+".zip ("+r.actions.filter(a=>a.status!=="Mapped").length+" stage(s) need manual work)");
+      }
+      await new Promise(res=>setTimeout(res));
+    }
+    if(pkg){
+      const att=[...pkg.att, ...pkg.vars.filter(v=>v.mode==="att")];
+      for(const a of att) out.file("attachments/"+a.path, await a.entry.async("uint8array"));
+      rep.push("", "Attachments copied: "+att.length);
+      if(envVars.length){
+        const cell=x=>'"'+String(x).replace(/"/g,'""')+'"';
+        const secret=v=>v.type==="password"||/pass|secret|token|key|credential/i.test(v.name);
+        out.file("variables/imported-variables.csv", "name,type,value\n"+envVars.map(v=>[v.name,v.type,secret(v)?"":v.value].map(cell).join(",")).join("\n"));
+        rep.push("Variables imported: "+envVars.length+" (secrets blanked)");
+      }
+    }
+    rep.push("", okN+" solution(s) created, "+blockedN+" blocked by validation.", "Import the .zip files under solutions/ in Power Automate (Solutions > Import). If PAD rejects one, paste the matching scripts/*.robin.txt into the PAD designer.");
+    out.file("README.txt", rep.join("\n"));
+    const blob=await out.generateAsync({type:"blob",compression:"DEFLATE"});
+    const nm=(pkg?pkg.zipName.replace(/\.zip$/i,""):"bundle").replace(/[^A-Za-z0-9_.-]/g,"_")||"bundle";
+    await saveFile(nm+"_pad_bundle.zip", blob);
+  }catch(e){ log("ERROR: "+e.message,"e"); alert("Bundle failed: "+e.message); }
+}
+$("bundleBtn").addEventListener("click", exportBundle);
+$("zipBtn").addEventListener("click", exportZip);
+$("robinBtn").addEventListener("click", ()=>current && saveFile(safeName()+".robin.txt", current.script));
+$("copyBtn").addEventListener("click", async ()=>{
+  try{ await navigator.clipboard.writeText(current.script); log("Script copied to clipboard."); }
+  catch(_){ showTab("script"); const t=$("script"), r=document.createRange(); r.selectNodeContents(t); const s=getSelection(); s.removeAllRanges(); s.addRange(r); log("Clipboard blocked — script selected in tab 4; use copy.","w"); }
+});
+
+/* ============ sample (multi-page, parameters, loops, cycle) ============ */
+const SAMPLE=`<?xml version="1.0" encoding="utf-8"?>
+<process name="Sample Complex" version="1.0">
+  <subsheet subsheetid="P-MAIN"><name>Main Page</name></subsheet>
+  <subsheet subsheetid="P-TAX"><name>Calc Tax</name></subsheet>
+  <stage stageid="m1" name="Start" type="Start"><subsheetid>P-MAIN</subsheetid><onsuccess>m2</onsuccess></stage>
+  <stage stageid="md1" name="Counter" type="Data"><subsheetid>P-MAIN</subsheetid><datatype>number</datatype><initialvalue>0</initialvalue></stage>
+  <stage stageid="md2" name="Total" type="Data"><subsheetid>P-MAIN</subsheetid><datatype>number</datatype><initialvalue>100</initialvalue></stage>
+  <stage stageid="md3" name="Items" type="Collection"><subsheetid>P-MAIN</subsheetid></stage>
+  <stage stageid="m2" name="Call Tax" type="SubSheet"><subsheetid>P-MAIN</subsheetid><processid>P-TAX</processid><inputs><input name="Amount" expr="[Total]"/></inputs><outputs><output name="Result" stage="Total"/></outputs><onsuccess>m3</onsuccess></stage>
+  <stage stageid="m3" name="Loop Items" type="Loop"><subsheetid>P-MAIN</subsheetid><loop type="Start" data="Items"/><onsuccess>m4</onsuccess></stage>
+  <stage stageid="m4" name="Increment" type="Calculation"><subsheetid>P-MAIN</subsheetid><calculation expression="[Counter] + 1" stage="Counter"/><onsuccess>m5</onsuccess></stage>
+  <stage stageid="m5" name="Loop End" type="Loop"><subsheetid>P-MAIN</subsheetid><loop type="End" data="Loop Items"/><onsuccess>m6</onsuccess></stage>
+  <stage stageid="m6" name="Counter &lt; 3?" type="Decision"><subsheetid>P-MAIN</subsheetid><decision expression="[Counter] &lt; 3"/><ontrue>m4</ontrue><onfalse>m7</onfalse></stage>
+  <stage stageid="m7" name="End" type="End"><subsheetid>P-MAIN</subsheetid></stage>
+  <stage stageid="t0" name="Calc Tax Info" type="SubSheetInfo"><subsheetid>P-TAX</subsheetid><onsuccess>t2</onsuccess></stage>
+  <stage stageid="td1" name="Amount" type="Data"><subsheetid>P-TAX</subsheetid><datatype>number</datatype></stage>
+  <stage stageid="td2" name="Result" type="Data"><subsheetid>P-TAX</subsheetid><datatype>number</datatype></stage>
+  <stage stageid="t2" name="Add 20%" type="Calculation"><subsheetid>P-TAX</subsheetid><calculation expression="[Amount] * 1.2" stage="Result"/><onsuccess>t3</onsuccess></stage>
+  <stage stageid="t3" name="End" type="End"><subsheetid>P-TAX</subsheetid></stage>
+</process>`;
+$("sampleBtn").addEventListener("click",()=>loadText(SAMPLE,"sample.bpprocess"));
+window.addEventListener("error", e=>log("ERROR: "+e.message,"e"));
+window.addEventListener("unhandledrejection", e=>log("ERROR: "+(e.reason&&e.reason.message||e.reason),"e"));
+log("Ready. Open a Blue Prism export or load the sample.");
+</script></body></html>
